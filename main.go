@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,12 +20,30 @@ import (
 	"charm.land/huh/v2"
 	"charm.land/huh/v2/spinner"
 	"github.com/andrewyur/canvas-scraper-go/api"
+	"github.com/andrewyur/canvas-scraper-go/requests"
 )
 
-const baseUrl = "https://sit.instructure.com"
+const defaultLogFilePath = ".canvas-log.txt"
 
 func main() {
-	client := &http.Client{}
+	client := &http.Client{Timeout: 45 * time.Second}
+
+	var logFilePath string
+	if value, set := os.LookupEnv("CANVAS_LOGFILE"); set {
+		logFilePath = value
+	} else {
+		logFilePath = defaultLogFilePath
+	}
+
+	if err := os.Remove(logFilePath); err != nil && !os.IsNotExist(err) {
+		log.Fatal("Could not open log file: ", err)
+	}
+	logFile, err := os.Create(logFilePath)
+	if err != nil {
+		log.Fatal("Could not create log file: ", err)
+	}
+	log.SetOutput(logFile)
+	defer logFile.Close()
 
 	var (
 		token           string
@@ -50,6 +70,7 @@ func main() {
 		huh.NewGroup(
 			huh.NewMultiSelect[int]().
 				Title("Which courses do you want to scrape?").
+				Description("Scroll with the arrow keys to access all courses, some may be obscured").
 				Value(&selectedCourses).
 				Height(30).
 				OptionsFunc(func() []huh.Option[int] {
@@ -86,7 +107,7 @@ func main() {
 
 	start := time.Now()
 
-	err := spinner.New().
+	err = spinner.New().
 		Type(spinner.Line).
 		Title(" Scraping Courses...").
 		Action(func() {
@@ -104,7 +125,6 @@ func main() {
 					scrapeCourse(client, courses[i], user, token, "courses", &wg)
 				}()
 			}
-
 			wg.Wait()
 		}).
 		Run()
@@ -113,7 +133,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Done in %.2fs. upload the courses directory into the Upload folder in the Coursework drive, and run the script\n", time.Since(start).Seconds())
+	fmt.Printf("Scraped %d courses in %.2fs. upload the courses directory into the Upload folder in the Coursework drive, and run the script\n", len(selectedCourses), time.Since(start).Seconds())
 }
 
 var sanitizeRegexp = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1f]`)
@@ -181,14 +201,14 @@ func scrapeCourse(client *http.Client, course api.Course, user api.User, token, 
 					go func() {
 						defer wg.Done()
 
-						resp, err := FetchFile(client, item, token)
+						resp, err := requests.Fetch(client, token, item)
 						if err != nil {
 							log.Println("Error fetching file:", err)
 							return
 						}
 
 						if err := saveResponse(resp, modulePath); err != nil {
-							log.Println("Error saving response to file:", err)
+							log.Println("Error saving response to file:", err, item)
 							return
 						}
 					}()
@@ -198,6 +218,8 @@ func scrapeCourse(client *http.Client, course api.Course, user api.User, token, 
 	}()
 }
 
+const staggerRange = 500
+
 func scrapeAssignment(client *http.Client, assignment api.Assignment, token, path string, wg *sync.WaitGroup) {
 	// files
 	for _, url := range assignment.Files {
@@ -205,7 +227,9 @@ func scrapeAssignment(client *http.Client, assignment api.Assignment, token, pat
 		go func() {
 			defer wg.Done()
 
-			resp, err := FetchFile(client, url, token)
+			// stagger download requests slightly to reduce rate limiting
+			time.Sleep(time.Duration(rand.Int()%staggerRange) * time.Millisecond)
+			resp, err := requests.Fetch(client, token, url)
 			if err != nil {
 				log.Println("Error fetching file:", err)
 				return
@@ -224,7 +248,8 @@ func scrapeAssignment(client *http.Client, assignment api.Assignment, token, pat
 		go func() {
 			defer wg.Done()
 
-			resp, err := FetchFile(client, url, token)
+			time.Sleep(time.Duration(rand.Int()%staggerRange) * time.Millisecond)
+			resp, err := requests.Fetch(client, token, url)
 			if err != nil {
 				log.Println("Error fetching file:", err)
 				return
@@ -264,31 +289,25 @@ func scrapeAssignment(client *http.Client, assignment api.Assignment, token, pat
 	}
 }
 
-func FetchFile(client *http.Client, url, token string) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.AddCookie(&http.Cookie{
-		Name:  "canvas_session",
-		Value: token,
-	})
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("api returned status: %s", resp.Status)
-	}
-
-	return resp, nil
-}
+const maxContentSize = 60 * 1024 * 1024 // 20MB
 
 func saveResponse(resp *http.Response, path string) error {
 	defer resp.Body.Close()
+
+	// skips mostly videos
+	contentSize, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+	if contentSize > maxContentSize {
+		// we don't consider this an error
+		if resp.Header.Get("Content-Type") != "video/mp4" {
+			log.Println(
+				"Max content size exceeded",
+				resp.Header.Get("Content-Type"),
+				resp.Header.Get("Content-Disposition"),
+				contentSize/(1024*1024), "MB",
+			)
+		}
+		return nil
+	}
 
 	disposition := resp.Header.Get("Content-Disposition")
 	_, params, err := mime.ParseMediaType(disposition)

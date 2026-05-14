@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/andrewyur/canvas-scraper-go/config"
+	"github.com/andrewyur/canvas-scraper-go/requests"
 )
 
 type rawModule struct {
@@ -24,15 +25,15 @@ type Module struct {
 func GetModules(client *http.Client, token, course string) ([]Module, error) {
 	url := config.BaseURL + "/api/v1/courses/" + course + "/modules?include[]=items&include[]=content_details&per_page=30"
 
-	body, err := fetchJSON(client, token, url)
+	resp, err := requests.Fetch(client, token, url)
 	if err != nil {
 		return nil, err
 	}
 
-	defer body.Close()
+	defer resp.Body.Close()
 
 	var rawModules []rawModule
-	if err := json.NewDecoder(body).Decode(&rawModules); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&rawModules); err != nil {
 		return nil, err
 	}
 

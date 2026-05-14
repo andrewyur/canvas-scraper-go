@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	"github.com/andrewyur/canvas-scraper-go/config"
+	"github.com/andrewyur/canvas-scraper-go/requests"
 )
 
 type rawAssignment struct {
@@ -43,15 +44,15 @@ type Assignment struct {
 func GetAssignments(client *http.Client, token, course string) ([]Assignment, error) {
 	url := config.BaseURL + "/api/v1/courses/" + course + "/assignments?per_page=100&include[]=submission"
 
-	body, err := fetchJSON(client, token, url)
+	resp, err := requests.Fetch(client, token, url)
 	if err != nil {
 		return nil, err
 	}
 
-	defer body.Close()
+	defer resp.Body.Close()
 
 	var rawAssignments []rawAssignment
-	if err := json.NewDecoder(body).Decode(&rawAssignments); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&rawAssignments); err != nil {
 		return nil, err
 	}
 

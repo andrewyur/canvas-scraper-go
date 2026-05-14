@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/andrewyur/canvas-scraper-go/config"
+	"github.com/andrewyur/canvas-scraper-go/requests"
 )
 
 type unparsedCourse struct {
@@ -40,15 +41,15 @@ type Course struct {
 func GetCourses(client *http.Client, token string) ([]Course, error) {
 	url := config.BaseURL + "/api/v1/courses?include[]=teachers&include[]=total_scores&include[]=concluded&include[]=term&per_page=100"
 
-	body, err := fetchJSON(client, token, url)
+	resp, err := requests.Fetch(client, token, url)
 	if err != nil {
 		return nil, err
 	}
 
-	defer body.Close()
+	defer resp.Body.Close()
 
 	var rawCourses []unparsedCourse
-	if err := json.NewDecoder(body).Decode(&rawCourses); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&rawCourses); err != nil {
 		return nil, err
 	}
 
@@ -79,6 +80,9 @@ func parseCourse(raw unparsedCourse) (Course, bool) {
 	numberParts := strings.Split(nameParts[2], "-")
 	name := nameParts[1] + " " + numberParts[0] + " - " + raw.CourseCode
 
+	// Sometimes teachers mess up the naming conventions
+	department := strings.Split(nameParts[1], "-")[0]
+
 	var grade string
 	if len(raw.Enrollments) > 0 && raw.Enrollments[0].ComputedCurrentScore != nil {
 		grade = fmt.Sprintf("%.2f%%", *raw.Enrollments[0].ComputedCurrentScore)
@@ -98,7 +102,7 @@ func parseCourse(raw unparsedCourse) (Course, bool) {
 
 	return Course{
 		ID:         strconv.Itoa(raw.ID),
-		Department: nameParts[1],
+		Department: department,
 		Name:       name,
 		Concluded:  raw.Concluded,
 		Grade:      grade,
