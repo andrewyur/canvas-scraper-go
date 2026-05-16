@@ -2,17 +2,13 @@ package api
 
 import (
 	"encoding/json"
-
-	"github.com/andrewyur/canvas-scraper-go/config"
 )
 
-type UserResponse struct {
-	Name string `json:"short_name"`
+type FileResponse struct {
+	Url *string `json:"url"`
 }
 
-func (c *Client) GetUser() (*UserResponse, error) {
-	url := config.BaseURL + "/api/v1/users/self"
-
+func (c *Client) GetFileDownloadUrl(url string) (*FileResponse, error) {
 	resp, err := c.Fetch(url)
 	if err != nil {
 		return nil, err
@@ -20,7 +16,7 @@ func (c *Client) GetUser() (*UserResponse, error) {
 
 	defer resp.Body.Close()
 
-	var out UserResponse
+	var out FileResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, err
 	}

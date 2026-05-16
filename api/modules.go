@@ -2,14 +2,12 @@ package api
 
 import (
 	"encoding/json"
-	"log"
-	"net/http"
+	"strconv"
 
 	"github.com/andrewyur/canvas-scraper-go/config"
-	"github.com/andrewyur/canvas-scraper-go/requests"
 )
 
-type rawModule struct {
+type ModuleResponse struct {
 	Name  string `json:"name"`
 	Items []struct {
 		Url  string `json:"url"`
@@ -17,48 +15,20 @@ type rawModule struct {
 	} `json:"items"`
 }
 
-type Module struct {
-	Name  string
-	Files []string
-}
+func (c *Client) GetModules(courseId int) ([]ModuleResponse, error) {
+	url := config.BaseURL + "/api/v1/courses/" + strconv.Itoa(courseId) + "/modules?include[]=items&include[]=content_details&per_page=30"
 
-func GetModules(client *http.Client, token, course string) ([]Module, error) {
-	url := config.BaseURL + "/api/v1/courses/" + course + "/modules?include[]=items&include[]=content_details&per_page=30"
-
-	resp, err := requests.Fetch(client, token, url)
+	resp, err := c.Fetch(url)
 	if err != nil {
 		return nil, err
 	}
 
 	defer resp.Body.Close()
 
-	var rawModules []rawModule
-	if err := json.NewDecoder(resp.Body).Decode(&rawModules); err != nil {
+	var out []ModuleResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, err
 	}
 
-	modules := make([]Module, 0, len(rawModules))
-	for _, raw := range rawModules {
-		files := make([]string, 0, len(raw.Items))
-		for _, item := range raw.Items {
-			if item.Type != "File" {
-				continue
-			}
-
-			if downloadUrl, err := getFileDownloadUrl(client, token, item.Url); err != nil {
-				log.Println("Couldn't get file download url:", downloadUrl)
-			} else {
-				files = append(files, downloadUrl)
-			}
-		}
-
-		if len(files) > 0 {
-			modules = append(modules, Module{
-				Name:  raw.Name,
-				Files: files,
-			})
-		}
-	}
-
-	return modules, nil
+	return out, nil
 }
