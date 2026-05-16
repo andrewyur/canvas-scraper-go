@@ -40,6 +40,11 @@ func parseCourse(raw api.CourseResponse) (CourseInfo, bool) {
 	}
 
 	nameParts := strings.Split(raw.Name, " ")
+
+	if len(nameParts) != 3 || len(nameParts[0]) != 5 {
+		return CourseInfo{}, false
+	}
+
 	var semester string
 	if nameParts[0][4] == 'F' {
 		semester = nameParts[0][:4] + " Fall"
