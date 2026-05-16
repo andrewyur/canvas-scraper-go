@@ -9,7 +9,7 @@ import (
 var sanitizeRegexp = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1f]`)
 
 func Sanitize(s string) string {
-	safe := sanitizeRegexp.ReplaceAllString(s, "_")
+	safe := sanitizeRegexp.ReplaceAllString(s, "-")
 	safe = strings.Trim(safe, ".")
 	return safe
 }

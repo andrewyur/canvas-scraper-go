@@ -16,9 +16,10 @@ import (
 	"github.com/andrewyur/canvas-scraper-go/api"
 	"github.com/andrewyur/canvas-scraper-go/pathbuilder"
 	"github.com/andrewyur/canvas-scraper-go/scraper"
+	"kythe.io/kythe/go/util/datasize"
 )
 
-const defaultLogFilePath = ".canvas-log.txt"
+const defaultLogFilePath = "canvas-log.txt"
 
 func main() {
 	httpClient := &http.Client{Timeout: 45 * time.Second}
@@ -42,9 +43,12 @@ func main() {
 
 	var (
 		token           string
+		maxSizeInput    = "20MB"
+		maxSize         datasize.Size
 		selectedCourses []int
 		courses         []scraper.CourseInfo
-		folderConfirm   bool
+		scrapeModules   = false
+		folderConfirm   = true
 		scraperHandle   *scraper.Scraper
 		apiClient       *api.Client
 	)
@@ -52,7 +56,7 @@ func main() {
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
-				Title("Enter 'canvas_session' value:").
+				Title("'canvas_session' Cookie Value").
 				Value(&token).
 				Description("Download a cookie inspector extension, and look for a cookie named 'canvas_session' when you are on the canvas page. Copy the value, and paste it here.").
 				Placeholder("ng9sjIp1SCIBuZzZwVL7Bw+lQPddj0IaBTBmNp2U1KyHobDse2EkTlRS49G9YKuuwTxQF5E-MjM9VT...").
@@ -65,15 +69,27 @@ func main() {
 				}),
 		),
 		huh.NewGroup(
+			huh.NewInput().
+				Title("Maximum File size").
+				Description("This will heavily affect how fast your courses upload to the drive. Check the log file to see which files are skipped. All videos are automatically skipped.").
+				Value(&maxSizeInput).
+				Placeholder("20MB").
+				Validate(func(str string) error {
+					size, err := datasize.Parse(str)
+					maxSize = size
+					return err
+				}),
+		),
+		huh.NewGroup(
 			huh.NewMultiSelect[int]().
-				Title("Which courses do you want to scrape?").
+				Title("Select Courses to Scrape").
 				Description("Scroll with the arrow keys to access all courses, some may be obscured").
 				Value(&selectedCourses).
 				Height(30).
 				OptionsFunc(func() []huh.Option[int] {
 					var err error
 					apiClient = api.NewClient(httpClient, token)
-					scraperHandle, err = scraper.NewScraper(apiClient)
+					scraperHandle, err = scraper.NewScraper(apiClient, maxSize.Bytes())
 
 					if err != nil {
 						log.Fatal("Could not create scraper:", err)
@@ -95,7 +111,14 @@ func main() {
 		),
 		huh.NewGroup(
 			huh.NewConfirm().
-				Title("Is it ok that courses are saved to a folder named 'courses' in the current directory?").
+				Title("Scrape Modules").
+				Description("Scraping modules for a course will take up a lot of space on the drive. Try to do this only when necessary").
+				Value(&scrapeModules),
+		),
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Destination Folder Confirmation").
+				Description("Is it ok that courses are saved to a folder named 'courses' in the current directory?").
 				Value(&folderConfirm),
 		),
 	)
@@ -124,7 +147,7 @@ func main() {
 
 			basePath := pathbuilder.NewPathBuilder("courses")
 
-			err := scraperHandle.ScrapeCourses(basePath, selectedCourseInfo)
+			err := scraperHandle.ScrapeCourses(basePath, selectedCourseInfo, scrapeModules)
 
 			scraperHandle.Close()
 

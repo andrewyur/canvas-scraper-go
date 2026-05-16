@@ -5,7 +5,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *Scraper) ScrapeCourses(path pathbuilder.PathBuilder, courses []CourseInfo) error {
+func (s *Scraper) ScrapeCourses(path pathbuilder.PathBuilder, courses []CourseInfo, scrapeModules bool) error {
 	g := errgroup.Group{}
 
 	for _, course := range courses {
@@ -21,9 +21,11 @@ func (s *Scraper) ScrapeCourses(path pathbuilder.PathBuilder, courses []CourseIn
 			return s.scrapeAssignments(coursePath, courseId)
 		})
 
-		g.Go(func() error {
-			return s.scrapeModules(coursePath, courseId)
-		})
+		if scrapeModules {
+			g.Go(func() error {
+				return s.scrapeModules(coursePath, courseId)
+			})
+		}
 	}
 	return g.Wait()
 }

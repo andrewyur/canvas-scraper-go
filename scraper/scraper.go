@@ -11,7 +11,7 @@ type Scraper struct {
 	userName  string
 }
 
-func NewScraper(apiClient *api.Client) (*Scraper, error) {
+func NewScraper(apiClient *api.Client, maxContentSize uint64) (*Scraper, error) {
 	userResponse, err := apiClient.GetUser()
 	if err != nil {
 		return nil, err
@@ -20,7 +20,7 @@ func NewScraper(apiClient *api.Client) (*Scraper, error) {
 	return &Scraper{
 		apiClient: apiClient,
 		userName:  userResponse.Name,
-		writer:    writer.CreateWriter(apiClient),
+		writer:    writer.CreateWriter(apiClient, maxContentSize),
 	}, nil
 }
 

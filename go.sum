@@ -64,3 +64,5 @@ golang.org/x/sync v0.20.0 h1:e0PTpb7pjO8GAtTs2dQ6jYa5BWYlMuX047Dco/pItO4=
 golang.org/x/sync v0.20.0/go.mod h1:9xrNwdLfx4jkKbNva9FpL6vEN7evnE43NNNJQ2LF3+0=
 golang.org/x/sys v0.42.0 h1:omrd2nAlyT5ESRdCLYdm3+fMfNFE/+Rf4bDIQImRJeo=
 golang.org/x/sys v0.42.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
+kythe.io v0.0.75 h1:cD2LSZNt+bjMSQ9SiW0harCkwj29AI+FqrxTON9dQM8=
+kythe.io v0.0.75/go.mod h1:OCHnadtIlhPlAOTUDc7NBI1x0lhDeH7vw9nu0hxnGZc=

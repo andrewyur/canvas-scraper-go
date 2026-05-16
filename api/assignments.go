@@ -8,11 +8,12 @@ import (
 )
 
 type AssignmentResponse struct {
-	ID             int     `json:"id"`
-	Name           string  `json:"name"`
-	Description    string  `json:"description"`
-	PointsPossible float32 `json:"points_possible"`
-	Rubric         []struct {
+	ID              int      `json:"id"`
+	Name            string   `json:"name"`
+	Description     string   `json:"description"`
+	PointsPossible  float32  `json:"points_possible"`
+	SubmissionTypes []string `json:"submission_types"`
+	Rubric          []struct {
 		ID              string  `json:"id"`
 		Description     string  `json:"description"`
 		LongDescription string  `json:"long_description"`

@@ -10,12 +10,13 @@ type Writer struct {
 	downloadJobs chan DownloadJob
 	writeJobs    chan WriteJob
 	group        *errgroup.Group
+	maxSize      uint64
 }
 
 // relatively arbitrary
 const numWorkers = 60
 
-func CreateWriter(apiClient *api.Client) *Writer {
+func CreateWriter(apiClient *api.Client, maxSize uint64) *Writer {
 	var g errgroup.Group
 
 	w := &Writer{
@@ -23,6 +24,7 @@ func CreateWriter(apiClient *api.Client) *Writer {
 		group:        &g,
 		downloadJobs: make(chan DownloadJob),
 		writeJobs:    make(chan WriteJob),
+		maxSize:      maxSize,
 	}
 
 	for range numWorkers {

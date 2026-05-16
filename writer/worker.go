@@ -39,8 +39,6 @@ func (w *Writer) startWorker() error {
 	return nil
 }
 
-const maxContentSize = 60 * 1024 * 1024 // 60MB
-
 func (w *Writer) executeDownloadJob(job DownloadJob) error {
 	if err := os.MkdirAll(job.Path, 0775); err != nil {
 		return err
@@ -51,9 +49,8 @@ func (w *Writer) executeDownloadJob(job DownloadJob) error {
 	}
 	defer resp.Body.Close()
 
-	// skips mostly videos
 	contentSize, err := strconv.Atoi(resp.Header.Get("Content-Length"))
-	if contentSize > maxContentSize {
+	if uint64(contentSize) > w.maxSize || resp.Header.Get("Content-Type") == "video/mp4" {
 		if resp.Header.Get("Content-Type") != "video/mp4" {
 			log.Println(
 				"Max content size exceeded",

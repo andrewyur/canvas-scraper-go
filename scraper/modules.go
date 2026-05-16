@@ -30,6 +30,7 @@ func (s *Scraper) scrapeModules(path pathbuilder.PathBuilder, courseId int) erro
 				}
 				if fileResponse.Url == nil {
 					log.Println("File locked, unable to get download Url:", item.Url, err)
+					return nil
 				}
 				s.writer.Download(writer.DownloadJob{
 					DownloadUrl: *fileResponse.Url,

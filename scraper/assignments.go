@@ -3,7 +3,9 @@ package scraper
 import (
 	"fmt"
 	"log"
+	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -22,6 +24,10 @@ func (s *Scraper) scrapeAssignments(path pathbuilder.PathBuilder, courseId int) 
 
 	var g errgroup.Group
 	for _, assignment := range assignments {
+		if !slices.Contains(assignment.SubmissionTypes, "online_upload") {
+			continue
+		}
+
 		assignment := assignment
 		g.Go(func() error {
 			submission, err := s.apiClient.GetSubmission(courseId, assignment.ID)
@@ -32,10 +38,14 @@ func (s *Scraper) scrapeAssignments(path pathbuilder.PathBuilder, courseId int) 
 			}
 
 			grade := (submission.Score / assignment.PointsPossible) * 100
-			assignmentPath := path.Fork(
-				"Assignments",
-				fmt.Sprintf("%s (%.0f%%)", assignment.Name, grade),
-			)
+			var assignmentFolderName string
+			if math.IsInf(float64(grade), 0) {
+				assignmentFolderName = fmt.Sprintf("%s (NA)", assignment.Name)
+			} else {
+				assignmentFolderName = fmt.Sprintf("%s (%.0f%%)", assignment.Name, grade)
+			}
+
+			assignmentPath := path.Fork("Assignments", assignmentFolderName)
 
 			// don't make network requests, so don't need a goroutine
 			s.scrapeAssignmentRubric(assignmentPath, assignment, submission)
