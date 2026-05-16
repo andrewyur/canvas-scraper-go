@@ -9,6 +9,11 @@ import (
 	"time"
 )
 
+// keeps rate limiting to a minimum
+const maxInFlightRequests = 40
+
+var sem = make(chan struct{}, maxInFlightRequests)
+
 func (c *Client) Fetch(url string) (*http.Response, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -20,7 +25,10 @@ func (c *Client) Fetch(url string) (*http.Response, error) {
 		Value: c.token,
 	})
 
+	sem <- struct{}{}
 	resp, err := c.httpClient.Do(req)
+	<-sem
+
 	if err != nil {
 		return nil, err
 	}
